@@ -243,7 +243,6 @@ evaluate_markers_roc <- function(expr_file, meta_file, markers,
   results
 }
 
-# --- Example usage ------------------------------------------------------------
 # mRNA (ZNF662 across multiple datasets)
 # DeLong CI (default), export TIFF+PDF, write a CSV per call
 evaluate_markers_roc("GSE74530_expression.csv", "GSE74530_meta.csv",
@@ -276,5 +275,5 @@ evaluate_markers_roc("GSE28100_expression.csv","GSE28100_meta.csv",
                      markers = mirnas, dataset_name = "GSE28100",
                      save_dir = "plots/miRNA", formats = c("tiff","pdf"))
 
-# If you choose bootstrap CIs, you can make it reproducible:
-# evaluate_markers_roc(..., ci_method = "bootstrap", boot_n = 2000, bootstrap_seed = 123)
+
+
