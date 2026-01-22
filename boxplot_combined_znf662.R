@@ -3,18 +3,21 @@ suppressPackageStartupMessages({
   library(dplyr)
   library(readr)
   library(cowplot)
-  library(ggpubr)  # only used if show_pvals = TRUE
+  library(ggpubr)   # only used if show_pvals = TRUE
+  library(magick)   # for reading plot.pdf
 })
 
 # ---- Global config ----
-show_pvals <- FALSE  # <- set TRUE to show Welch t-test p-values on each panel
+show_pvals   <- FALSE              # TRUE to show Welch t-test p-values
 allowed_groups <- c("Normal", "Cancer")
 
+dpi_single <- 1200   # per-panel images
+dpi_large  <- 600    # big multi-panel figures (to avoid memory errors)
+
 # ------------------------------------------------------------
-# Helper: build boxplot given a plot_df (Sample, Expression, Group), title, y_limits
+# Helper: build boxplot given plot_df (Sample, Expression, Group)
 # ------------------------------------------------------------
 make_boxplot <- function(plot_df, panel_title, y_limits, show_pvals = FALSE) {
-  # sample counts for labels
   nN <- sum(plot_df$Group == "Normal")
   nC <- sum(plot_df$Group == "Cancer")
   x_labels <- c("Normal" = paste0("Normal (n=", nN, ")"),
@@ -27,15 +30,17 @@ make_boxplot <- function(plot_df, panel_title, y_limits, show_pvals = FALSE) {
     scale_x_discrete(labels = x_labels) +
     coord_cartesian(ylim = y_limits, clip = "off") +
     labs(title = panel_title, x = "Group", y = "Expression") +
-    theme_minimal(base_size = 14) +
+    theme_minimal(base_size = 13) +
     theme(
       legend.position = "none",
-      plot.title = element_text(hjust = 0)
+      plot.title      = element_text(hjust = 0, size = 11)
     )
   
   if (isTRUE(show_pvals)) {
-    y_lab <- y_limits[2] - 0.02 * diff(y_limits)  # consistent label position
-    p <- p + stat_compare_means(method = "t.test", label = "p.format", label.y = y_lab)
+    y_lab <- y_limits[2] - 0.02 * diff(y_limits)
+    p <- p + stat_compare_means(method = "t.test",
+                                label = "p.format",
+                                label.y = y_lab)
   }
   p
 }
@@ -51,7 +56,6 @@ mRNA_datasets <- list(
   GSE246050 = list(expr = "GSE246050_expression.csv", meta = "GSE246050_meta.csv")
 )
 
-# loader that returns plot_df or NULL
 load_mRNA_df <- function(ds_name, files, gene = "ZNF662") {
   expr <- read.csv(files$expr, row.names = 1, check.names = FALSE, stringsAsFactors = FALSE)
   meta <- read.csv(files$meta, stringsAsFactors = FALSE)
@@ -63,7 +67,6 @@ load_mRNA_df <- function(ds_name, files, gene = "ZNF662") {
   common_samples <- intersect(colnames(expr), meta$Sample)
   if (length(common_samples) < 3) return(NULL)
   
-  # Filter meta to common samples and allowed groups
   meta <- meta %>%
     filter(Sample %in% common_samples, Group %in% allowed_groups) %>%
     mutate(Group = factor(Group, levels = c("Normal","Cancer")))
@@ -79,7 +82,6 @@ load_mRNA_df <- function(ds_name, files, gene = "ZNF662") {
   )
 }
 
-# gather all mRNA data and global y
 mRNA_list <- lapply(names(mRNA_datasets), function(nm) {
   load_mRNA_df(nm, mRNA_datasets[[nm]], mRNA_gene)
 })
@@ -92,51 +94,43 @@ mRNA_range <- range(mRNA_all$Expression, na.rm = TRUE)
 mRNA_pad   <- diff(mRNA_range); if (is.na(mRNA_pad) || mRNA_pad == 0) mRNA_pad <- 1
 mRNA_ylim  <- c(mRNA_range[1] - 0.05*mRNA_pad, mRNA_range[2] + 0.10*mRNA_pad)
 
-# build/save per-dataset plots
 mRNA_plots <- list()
 for (ds in names(mRNA_list)) {
   df <- mRNA_list[[ds]]
-  title <- paste0(mRNA_gene, " Expression (", ds, ")")
+  title <- paste0(mRNA_gene, " (", ds, ")")
   p <- make_boxplot(df, title, mRNA_ylim, show_pvals)
   mRNA_plots[[ds]] <- p
   
   suffix <- if (show_pvals) "_boxplot_ttest" else "_boxplot_NOPVAL"
   base   <- paste0(ds, "_", mRNA_gene, suffix)
   
-  ggsave(
-    filename = paste0(base, ".png"),
-    plot     = p, width = 7, height = 7, dpi = 300
-  )
-  ggsave(
-    filename = paste0(base, ".pdf"),
-    plot     = p, width = 7, height = 7
-  )
-  ggsave(
-    filename = paste0(base, ".tiff"),
-    plot     = p, width = 7, height = 7, dpi = 600, compression = "lzw"
-  )
+  ggsave(paste0(base, ".png"),  plot = p, width = 7, height = 7, dpi = dpi_single)
+  ggsave(paste0(base, ".pdf"),  plot = p, width = 7, height = 7)
+  ggsave(paste0(base, ".tiff"), plot = p, width = 7, height = 7,
+         dpi = dpi_single, compression = "lzw")
 }
 
-# combined mRNA 2×2 panel with lowercase labels (a), (b), (c)...
-mRNA_labels <- paste0("(", letters[1:length(mRNA_plots)], ")")
 mRNA_combined <- cowplot::plot_grid(
-  plotlist   = mRNA_plots,
-  labels     = mRNA_labels,
-  label_size = 14,
-  ncol       = 2
+  plotlist = mRNA_plots,
+  ncol     = 2
 )
 mRNA_base <- paste0(mRNA_gene, "_boxplot_all_mRNA_", if (show_pvals) "ttest" else "NOPVAL")
 
-ggsave(filename = paste0(mRNA_base, ".png"),  plot = mRNA_combined, width = 14, height = 14, dpi = 300)
-ggsave(filename = paste0(mRNA_base, ".pdf"),  plot = mRNA_combined, width = 14, height = 14)
-ggsave(filename = paste0(mRNA_base, ".tiff"), plot = mRNA_combined, width = 14, height = 14, dpi = 600, compression = "lzw")
+ggsave(paste0(mRNA_base, ".png"),  plot = mRNA_combined, width = 14, height = 14, dpi = dpi_large)
+ggsave(paste0(mRNA_base, ".pdf"),  plot = mRNA_combined, width = 14, height = 14)
+ggsave(paste0(mRNA_base, ".tiff"), plot = mRNA_combined, width = 14, height = 14,
+       dpi = dpi_large, compression = "lzw")
 
 # =========================
-# SECTION 2 — miRNAs: 6 targets (GSE28100)
+# SECTION 2 — miRNAs: 9 targets (GSE28100)
 # =========================
 miRNA_ds <- list(expr = "GSE28100_expression.csv", meta = "GSE28100_meta.csv")
-mirnas <- c("hsa-miR-28-5p", "hsa-miR-146b-5p", "hsa-miR-424-5p",
-            "hsa-miR-16-5p", "hsa-miR-15b-5p", "hsa-miR-15a-5p")
+
+mirnas <- c(
+  "hsa-miR-625-3p", "hsa-miR-625-5p", "hsa-miR-28-5p",
+  "hsa-miR-146b-5p","hsa-miR-424-5p","hsa-miR-374a-3p",
+  "hsa-miR-16-5p",  "hsa-miR-15b-5p","hsa-miR-15a-5p"
+)
 
 normalize_mir <- function(x) {
   x <- tolower(trimws(x))
@@ -159,12 +153,9 @@ meta_mi <- meta_mi %>%
 stopifnot(nrow(meta_mi) > 0)
 expr_mi <- expr_mi[, meta_mi$Sample, drop = FALSE]
 
-# Prepare miRNA plots & uniform y-limits across all selected miRNAs
 mi_plots <- list()
 mi_dfs   <- list()
-
-# Find rows for each miRNA robustly
-rn_norm <- normalize_mir(rownames(expr_mi))
+rn_norm  <- normalize_mir(rownames(expr_mi))
 
 for (mir in mirnas) {
   hits <- which(rn_norm == normalize_mir(mir))
@@ -189,10 +180,9 @@ mi_range <- range(mi_all$Expression, na.rm = TRUE)
 mi_pad   <- diff(mi_range); if (is.na(mi_pad) || mi_pad == 0) mi_pad <- 1
 mi_ylim  <- c(mi_range[1] - 0.05*mi_pad, mi_range[2] + 0.10*mi_pad)
 
-# Build/save per-miRNA plots
 for (mir in names(mi_dfs)) {
   df <- mi_dfs[[mir]]
-  title <- paste0(mir, " Expression (GSE28100)")
+  title <- paste0(mir, "\n(GSE28100)")
   p <- make_boxplot(df, title, mi_ylim, show_pvals)
   mi_plots[[mir]] <- p
   
@@ -200,33 +190,22 @@ for (mir in names(mi_dfs)) {
   suffix <- if (show_pvals) "_ttest" else "_NOPVAL"
   base   <- paste0("GSE28100_", safe, suffix)
   
-  ggsave(
-    filename = paste0(base, ".png"),
-    plot = p, width = 7, height = 7, dpi = 300
-  )
-  ggsave(
-    filename = paste0(base, ".pdf"),
-    plot = p, width = 7, height = 7
-  )
-  ggsave(
-    filename = paste0(base, ".tiff"),
-    plot = p, width = 7, height = 7, dpi = 600, compression = "lzw"
-  )
+  ggsave(paste0(base, ".png"),  plot = p, width = 7, height = 7, dpi = dpi_single)
+  ggsave(paste0(base, ".pdf"),  plot = p, width = 7, height = 7)
+  ggsave(paste0(base, ".tiff"), plot = p, width = 7, height = 7,
+         dpi = dpi_single, compression = "lzw")
 }
 
-# combined miRNA grid with lowercase labels
-mi_labels <- paste0("(", letters[1:length(mi_plots)], ")")
 mi_combined <- cowplot::plot_grid(
-  plotlist   = mi_plots,
-  labels     = mi_labels,
-  label_size = 14,
-  ncol       = 3
+  plotlist = mi_plots,
+  ncol     = 3
 )
 mi_base <- paste0("miRNA_boxplots_GSE28100_", if (show_pvals) "ttest" else "NOPVAL")
 
-ggsave(filename = paste0(mi_base, ".png"),  plot = mi_combined, width = 14, height = 12, dpi = 300)
-ggsave(filename = paste0(mi_base, ".pdf"),  plot = mi_combined, width = 14, height = 12)
-ggsave(filename = paste0(mi_base, ".tiff"), plot = mi_combined, width = 14, height = 12, dpi = 600, compression = "lzw")
+ggsave(paste0(mi_base, ".png"),  plot = mi_combined, width = 14, height = 14, dpi = dpi_large)
+ggsave(paste0(mi_base, ".pdf"),  plot = mi_combined, width = 14, height = 14)
+ggsave(paste0(mi_base, ".tiff"), plot = mi_combined, width = 14, height = 14,
+       dpi = dpi_large, compression = "lzw")
 
 # =========================
 # SECTION 3 — lncRNA: XIST (GSE125866)
@@ -261,23 +240,22 @@ lnc_range <- range(lnc_df$Expression, na.rm = TRUE)
 lnc_pad   <- diff(lnc_range); if (is.na(lnc_pad) || lnc_pad == 0) lnc_pad <- 1
 lnc_ylim  <- c(lnc_range[1] - 0.05*lnc_pad, lnc_range[2] + 0.10*lnc_pad)
 
-lnc_title <- paste0(lnc_target, " Expression (GSE125866)")
+lnc_title <- paste0(lnc_target, " (GSE125866)")
 lnc_plot  <- make_boxplot(lnc_df, lnc_title, lnc_ylim, show_pvals)
 
 lnc_suffix <- if (show_pvals) "_ttest" else "_NOPVAL"
 lnc_base   <- paste0("GSE125866_", lnc_target, lnc_suffix)
 
-ggsave(filename = paste0(lnc_base, ".png"),  plot = lnc_plot, width = 7, height = 7, dpi = 300)
-ggsave(filename = paste0(lnc_base, ".pdf"),  plot = lnc_plot, width = 7, height = 7)
-ggsave(filename = paste0(lnc_base, ".tiff"), plot = lnc_plot, width = 7, height = 7, dpi = 600, compression = "lzw")
+ggsave(paste0(lnc_base, ".png"),  plot = lnc_plot, width = 7, height = 7, dpi = dpi_single)
+ggsave(paste0(lnc_base, ".pdf"),  plot = lnc_plot, width = 7, height = 7)
+ggsave(paste0(lnc_base, ".tiff"), plot = lnc_plot, width = 7, height = 7,
+       dpi = dpi_single, compression = "lzw")
 
 # =========================
-# GRAND COMBINED FIGURE — mRNA (4) + miRNA (6) + lncRNA (1) = 11 panels
+# SECTION 4 — grand 11-panel (optional)
 # =========================
-grand_plots <- c(mRNA_plots, mi_plots, list(lnc_plot))
-
-# lowercase labels (a), (b), ..., length matches number of panels
-grand_labels <- paste0("(", letters[1:length(grand_plots)], ")")
+grand_plots  <- c(mRNA_plots, mi_plots, list(lnc_plot))
+grand_labels <- letters[1:length(grand_plots)]
 
 grand_combined <- cowplot::plot_grid(
   plotlist   = grand_plots,
@@ -288,13 +266,56 @@ grand_combined <- cowplot::plot_grid(
 
 grand_base <- paste0("ALL_panels_mRNA_miRNA_lncRNA_", if (show_pvals) "ttest" else "NOPVAL")
 
-ggsave(filename = paste0(grand_base, ".png"),  plot = grand_combined, width = 21, height = 21, dpi = 300)
-ggsave(filename = paste0(grand_base, ".pdf"),  plot = grand_combined, width = 21, height = 21)
-ggsave(filename = paste0(grand_base, ".tiff"), plot = grand_combined, width = 21, height = 21, dpi = 600, compression = "lzw")
+ggsave(paste0(grand_base, ".png"),  plot = grand_combined, width = 21, height = 21, dpi = dpi_large)
+ggsave(paste0(grand_base, ".pdf"),  plot = grand_combined, width = 21, height = 21)
+ggsave(paste0(grand_base, ".tiff"), plot = grand_combined, width = 21, height = 21,
+       dpi = dpi_large, compression = "lzw")
 
-cat("✅ Done. Saved:\n",
-    "- Per-dataset ZNF662 panels + combined mRNA panel: ", mRNA_base, ".*\n",
-    "- 6 miRNA panels + combined miRNA panel: ", mi_base, ".*\n",
-    "- XIST (GSE125866): ", lnc_base, ".*\n",
-    "- GRAND combined figure with all panels: ", grand_base, ".*\n",
-    sep = "")
+# =========================
+# SECTION 5 — External ZNF662 plot from plot.pdf (panel d)
+# =========================
+external_plot <- NULL
+
+if (file.exists("plot.pdf")) {
+  if (requireNamespace("pdftools", quietly = TRUE)) {
+    img_pdf <- magick::image_read_pdf("plot.pdf", density = dpi_large)[1]
+    external_plot <- cowplot::ggdraw() + cowplot::draw_image(img_pdf)
+  } else {
+    warning("Package 'pdftools' not installed; run install.packages('pdftools') to include plot.pdf.")
+  }
+} else {
+  warning("plot.pdf not found; external panel (d) will be skipped.")
+}
+
+# =========================
+# SECTION 6 — final a/b/c(/d) figure
+# =========================
+if (!is.null(external_plot)) {
+  abc_plots   <- list(mRNA_combined, lnc_plot, mi_combined, external_plot)
+  abc_labels  <- c("a", "b", "c", "d")
+  abc_heights <- c(1.3, 0.7, 1.7, 1.0)
+} else {
+  abc_plots   <- list(mRNA_combined, lnc_plot, mi_combined)
+  abc_labels  <- c("a", "b", "c")
+  abc_heights <- c(1.3, 0.7, 1.7)
+}
+
+abc_combined <- cowplot::plot_grid(
+  plotlist    = abc_plots,
+  labels      = abc_labels,
+  label_size  = 18,
+  ncol        = 1,
+  rel_heights = abc_heights
+)
+
+abc_base <- paste0("BOX_ZNF662_XIST_miRNAs_external_", if (show_pvals) "ttest" else "NOPVAL")
+
+ggsave(paste0(abc_base, ".png"),
+       plot = abc_combined, width = 10, height = 18, dpi = dpi_large)
+ggsave(paste0(abc_base, ".pdf"),
+       plot = abc_combined, width = 10, height = 18)
+ggsave(paste0(abc_base, ".tiff"),
+       plot = abc_combined, width = 10, height = 18,
+       dpi = dpi_large, compression = "lzw")
+
+cat("✅ Done. Single panels at 1200 dpi, large combined figures at 600 dpi.\n")
