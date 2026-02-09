@@ -30,10 +30,16 @@ make_boxplot <- function(plot_df, panel_title, y_limits, show_pvals = FALSE) {
     scale_x_discrete(labels = x_labels) +
     coord_cartesian(ylim = y_limits, clip = "off") +
     labs(title = panel_title, x = "Group", y = "Expression") +
-    theme_minimal(base_size = 13) +
+    theme_minimal(base_size = 18) +
     theme(
-      legend.position = "none",
-      plot.title      = element_text(hjust = 0, size = 11)
+      legend.position  = "none",
+      plot.title       = element_text(hjust = 0, size = 20, face = "bold"),
+      axis.title.x     = element_text(size = 18),
+      axis.title.y     = element_text(size = 18),
+      axis.text.x      = element_text(size = 16),
+      axis.text.y      = element_text(size = 16),
+      panel.background = element_rect(fill = "white", color = NA),
+      plot.background  = element_rect(fill = "white", color = NA)
     )
   
   if (isTRUE(show_pvals)) {
@@ -50,10 +56,10 @@ make_boxplot <- function(plot_df, panel_title, y_limits, show_pvals = FALSE) {
 # =========================
 mRNA_gene <- "ZNF662"
 mRNA_datasets <- list(
-  GSE74530  = list(expr = "GSE74530_expression.csv",  meta = "GSE74530_meta.csv"),
-  GSE150469 = list(expr = "GSE150469_expression.csv", meta = "GSE150469_meta.csv"),
-  GSE30784  = list(expr = "GSE30784_expression.csv",  meta = "GSE30784_meta.csv"),
-  GSE246050 = list(expr = "GSE246050_expression.csv", meta = "GSE246050_meta.csv")
+  GSE74530   = list(expr = "GSE74530_expression.csv",  meta = "GSE74530_meta.csv"),
+  GSE150469  = list(expr = "GSE150469_expression.csv", meta = "GSE150469_meta.csv"),
+  GSE30784   = list(expr = "GSE30784_expression.csv",  meta = "GSE30784_meta.csv"),
+  GSE246050  = list(expr = "GSE246050_expression.csv", meta = "GSE246050_meta.csv")
 )
 
 load_mRNA_df <- function(ds_name, files, gene = "ZNF662") {
@@ -104,10 +110,13 @@ for (ds in names(mRNA_list)) {
   suffix <- if (show_pvals) "_boxplot_ttest" else "_boxplot_NOPVAL"
   base   <- paste0(ds, "_", mRNA_gene, suffix)
   
-  ggsave(paste0(base, ".png"),  plot = p, width = 7, height = 7, dpi = dpi_single)
-  ggsave(paste0(base, ".pdf"),  plot = p, width = 7, height = 7)
-  ggsave(paste0(base, ".tiff"), plot = p, width = 7, height = 7,
-         dpi = dpi_single, compression = "lzw")
+  ggsave(paste0(base, ".png"),
+         plot = p, width = 7, height = 7, dpi = dpi_single, bg = "white")
+  ggsave(paste0(base, ".pdf"),
+         plot = p, width = 7, height = 7, bg = "white")
+  ggsave(paste0(base, ".tiff"),
+         plot = p, width = 7, height = 7,
+         dpi = dpi_single, compression = "lzw", bg = "white")
 }
 
 mRNA_combined <- cowplot::plot_grid(
@@ -116,10 +125,13 @@ mRNA_combined <- cowplot::plot_grid(
 )
 mRNA_base <- paste0(mRNA_gene, "_boxplot_all_mRNA_", if (show_pvals) "ttest" else "NOPVAL")
 
-ggsave(paste0(mRNA_base, ".png"),  plot = mRNA_combined, width = 14, height = 14, dpi = dpi_large)
-ggsave(paste0(mRNA_base, ".pdf"),  plot = mRNA_combined, width = 14, height = 14)
-ggsave(paste0(mRNA_base, ".tiff"), plot = mRNA_combined, width = 14, height = 14,
-       dpi = dpi_large, compression = "lzw")
+ggsave(paste0(mRNA_base, ".png"),
+       plot = mRNA_combined, width = 14, height = 14, dpi = dpi_large, bg = "white")
+ggsave(paste0(mRNA_base, ".pdf"),
+       plot = mRNA_combined, width = 14, height = 14, bg = "white")
+ggsave(paste0(mRNA_base, ".tiff"),
+       plot = mRNA_combined, width = 14, height = 14,
+       dpi = dpi_large, compression = "lzw", bg = "white")
 
 # =========================
 # SECTION 2 — miRNAs: 9 targets (GSE28100)
@@ -127,8 +139,7 @@ ggsave(paste0(mRNA_base, ".tiff"), plot = mRNA_combined, width = 14, height = 14
 miRNA_ds <- list(expr = "GSE28100_expression.csv", meta = "GSE28100_meta.csv")
 
 mirnas <- c(
-  "hsa-miR-625-3p", "hsa-miR-625-5p", "hsa-miR-28-5p",
-  "hsa-miR-146b-5p","hsa-miR-424-5p","hsa-miR-374a-3p",
+  "hsa-miR-28-5p","hsa-miR-146b-5p","hsa-miR-424-5p",
   "hsa-miR-16-5p",  "hsa-miR-15b-5p","hsa-miR-15a-5p"
 )
 
@@ -183,17 +194,27 @@ mi_ylim  <- c(mi_range[1] - 0.05*mi_pad, mi_range[2] + 0.10*mi_pad)
 for (mir in names(mi_dfs)) {
   df <- mi_dfs[[mir]]
   title <- paste0(mir, "\n(GSE28100)")
-  p <- make_boxplot(df, title, mi_ylim, show_pvals)
+  
+  # Smaller x-axis text for miRNA panels (Panel C)
+  p <- make_boxplot(df, title, mi_ylim, show_pvals) +
+    theme(
+      axis.text.x  = element_text(size = 12),
+      axis.title.x = element_text(size = 14)
+    )
+  
   mi_plots[[mir]] <- p
   
   safe   <- gsub("[^A-Za-z0-9_\\-]", "_", mir)
   suffix <- if (show_pvals) "_ttest" else "_NOPVAL"
   base   <- paste0("GSE28100_", safe, suffix)
   
-  ggsave(paste0(base, ".png"),  plot = p, width = 7, height = 7, dpi = dpi_single)
-  ggsave(paste0(base, ".pdf"),  plot = p, width = 7, height = 7)
-  ggsave(paste0(base, ".tiff"), plot = p, width = 7, height = 7,
-         dpi = dpi_single, compression = "lzw")
+  ggsave(paste0(base, ".png"),
+         plot = p, width = 7, height = 7, dpi = dpi_single, bg = "white")
+  ggsave(paste0(base, ".pdf"),
+         plot = p, width = 7, height = 7, bg = "white")
+  ggsave(paste0(base, ".tiff"),
+         plot = p, width = 7, height = 7,
+         dpi = dpi_single, compression = "lzw", bg = "white")
 }
 
 mi_combined <- cowplot::plot_grid(
@@ -202,10 +223,13 @@ mi_combined <- cowplot::plot_grid(
 )
 mi_base <- paste0("miRNA_boxplots_GSE28100_", if (show_pvals) "ttest" else "NOPVAL")
 
-ggsave(paste0(mi_base, ".png"),  plot = mi_combined, width = 14, height = 14, dpi = dpi_large)
-ggsave(paste0(mi_base, ".pdf"),  plot = mi_combined, width = 14, height = 14)
-ggsave(paste0(mi_base, ".tiff"), plot = mi_combined, width = 14, height = 14,
-       dpi = dpi_large, compression = "lzw")
+ggsave(paste0(mi_base, ".png"),
+       plot = mi_combined, width = 14, height = 14, dpi = dpi_large, bg = "white")
+ggsave(paste0(mi_base, ".pdf"),
+       plot = mi_combined, width = 14, height = 14, bg = "white")
+ggsave(paste0(mi_base, ".tiff"),
+       plot = mi_combined, width = 14, height = 14,
+       dpi = dpi_large, compression = "lzw", bg = "white")
 
 # =========================
 # SECTION 3 — lncRNA: XIST (GSE125866)
@@ -246,10 +270,13 @@ lnc_plot  <- make_boxplot(lnc_df, lnc_title, lnc_ylim, show_pvals)
 lnc_suffix <- if (show_pvals) "_ttest" else "_NOPVAL"
 lnc_base   <- paste0("GSE125866_", lnc_target, lnc_suffix)
 
-ggsave(paste0(lnc_base, ".png"),  plot = lnc_plot, width = 7, height = 7, dpi = dpi_single)
-ggsave(paste0(lnc_base, ".pdf"),  plot = lnc_plot, width = 7, height = 7)
-ggsave(paste0(lnc_base, ".tiff"), plot = lnc_plot, width = 7, height = 7,
-       dpi = dpi_single, compression = "lzw")
+ggsave(paste0(lnc_base, ".png"),
+       plot = lnc_plot, width = 7, height = 7, dpi = dpi_single, bg = "white")
+ggsave(paste0(lnc_base, ".pdf"),
+       plot = lnc_plot, width = 7, height = 7, bg = "white")
+ggsave(paste0(lnc_base, ".tiff"),
+       plot = lnc_plot, width = 7, height = 7,
+       dpi = dpi_single, compression = "lzw", bg = "white")
 
 # =========================
 # SECTION 4 — grand 11-panel (optional)
@@ -260,16 +287,19 @@ grand_labels <- letters[1:length(grand_plots)]
 grand_combined <- cowplot::plot_grid(
   plotlist   = grand_plots,
   labels     = grand_labels,
-  label_size = 14,
+  label_size = 18,
   ncol       = 3
 )
 
 grand_base <- paste0("ALL_panels_mRNA_miRNA_lncRNA_", if (show_pvals) "ttest" else "NOPVAL")
 
-ggsave(paste0(grand_base, ".png"),  plot = grand_combined, width = 21, height = 21, dpi = dpi_large)
-ggsave(paste0(grand_base, ".pdf"),  plot = grand_combined, width = 21, height = 21)
-ggsave(paste0(grand_base, ".tiff"), plot = grand_combined, width = 21, height = 21,
-       dpi = dpi_large, compression = "lzw")
+ggsave(paste0(grand_base, ".png"),
+       plot = grand_combined, width = 21, height = 21, dpi = dpi_large, bg = "white")
+ggsave(paste0(grand_base, ".pdf"),
+       plot = grand_combined, width = 21, height = 21, bg = "white")
+ggsave(paste0(grand_base, ".tiff"),
+       plot = grand_combined, width = 21, height = 21,
+       dpi = dpi_large, compression = "lzw", bg = "white")
 
 # =========================
 # SECTION 5 — External ZNF662 plot from plot.pdf (panel d)
@@ -277,6 +307,7 @@ ggsave(paste0(grand_base, ".tiff"), plot = grand_combined, width = 21, height = 
 external_plot <- NULL
 
 if (file.exists("plot.pdf")) {
+  # magick::image_read_pdf() requires 'pdftools' installed
   if (requireNamespace("pdftools", quietly = TRUE)) {
     img_pdf <- magick::image_read_pdf("plot.pdf", density = dpi_large)[1]
     external_plot <- cowplot::ggdraw() + cowplot::draw_image(img_pdf)
@@ -292,18 +323,18 @@ if (file.exists("plot.pdf")) {
 # =========================
 if (!is.null(external_plot)) {
   abc_plots   <- list(mRNA_combined, lnc_plot, mi_combined, external_plot)
-  abc_labels  <- c("a", "b", "c", "d")
+  abc_labels  <- c("A", "B", "C", "D")
   abc_heights <- c(1.3, 0.7, 1.7, 1.0)
 } else {
   abc_plots   <- list(mRNA_combined, lnc_plot, mi_combined)
-  abc_labels  <- c("a", "b", "c")
+  abc_labels  <- c("A", "B", "C")
   abc_heights <- c(1.3, 0.7, 1.7)
 }
 
 abc_combined <- cowplot::plot_grid(
   plotlist    = abc_plots,
   labels      = abc_labels,
-  label_size  = 18,
+  label_size  = 20,
   ncol        = 1,
   rel_heights = abc_heights
 )
@@ -311,11 +342,11 @@ abc_combined <- cowplot::plot_grid(
 abc_base <- paste0("BOX_ZNF662_XIST_miRNAs_external_", if (show_pvals) "ttest" else "NOPVAL")
 
 ggsave(paste0(abc_base, ".png"),
-       plot = abc_combined, width = 10, height = 18, dpi = dpi_large)
+       plot = abc_combined, width = 10, height = 18, dpi = dpi_large, bg = "white")
 ggsave(paste0(abc_base, ".pdf"),
-       plot = abc_combined, width = 10, height = 18)
+       plot = abc_combined, width = 10, height = 18, bg = "white")
 ggsave(paste0(abc_base, ".tiff"),
        plot = abc_combined, width = 10, height = 18,
-       dpi = dpi_large, compression = "lzw")
+       dpi = dpi_large, compression = "lzw", bg = "white")
 
-cat("✅ Done. Single panels at 1200 dpi, large combined figures at 600 dpi.\n")
+cat("✅ Done. Single panels at 1200 dpi, large combined figures at 600 dpi, white background, enlarged text, smaller x-axis text for miRNA panels.\n")
