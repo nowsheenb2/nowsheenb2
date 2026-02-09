@@ -134,7 +134,7 @@ ggsave(paste0(mRNA_base, ".tiff"),
        dpi = dpi_large, compression = "lzw", bg = "white")
 
 # =========================
-# SECTION 2 — miRNAs: 9 targets (GSE28100)
+# SECTION 2 — miRNAs: 6 targets (GSE28100)
 # =========================
 miRNA_ds <- list(expr = "GSE28100_expression.csv", meta = "GSE28100_meta.csv")
 
@@ -302,7 +302,7 @@ ggsave(paste0(grand_base, ".tiff"),
        dpi = dpi_large, compression = "lzw", bg = "white")
 
 # =========================
-# SECTION 5 — External ZNF662 plot from plot.pdf (panel d)
+# SECTION 5 — External ZNF662 plot from plot.pdf (panel D)
 # =========================
 external_plot <- NULL
 
@@ -319,7 +319,7 @@ if (file.exists("plot.pdf")) {
 }
 
 # =========================
-# SECTION 6 — final a/b/c(/d) figure
+# SECTION 6 — final A/B/C(/D) figure
 # =========================
 if (!is.null(external_plot)) {
   abc_plots   <- list(mRNA_combined, lnc_plot, mi_combined, external_plot)
@@ -350,3 +350,4 @@ ggsave(paste0(abc_base, ".tiff"),
        dpi = dpi_large, compression = "lzw", bg = "white")
 
 cat("✅ Done. Single panels at 1200 dpi, large combined figures at 600 dpi, white background, enlarged text, smaller x-axis text for miRNA panels.\n")
+
